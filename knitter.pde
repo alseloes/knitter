@@ -5,16 +5,16 @@ import java.util.HashSet;
 ////////////////////////////////////////////////////////////////////////////////
 
 // Image's filename. Should be a square image for circle and square mode.
-final String FILENAME = "image.jpg";
+final String FILENAME = "images/clara10c.jpg";
 
 // Number of pins
-final int NR_PINS = 200;
+final int NR_PINS = 256;
 
 // RECTANGLE, SQUARE or CIRCLE shape
 final Mode MODE = Mode.CIRCLE;
 
 // Real size to calculate total thread length (circle diameter or square/recangle longest side)
-final float REAL_SIZE = 0.8; // [m]
+final float REAL_SIZE = 0.595; // [m]
 
 // Increase to visualize a thicker thread
 final float THREAD_THICKNESS = 1.0; // (1.0 = all-purpose sewing thread, approx. 0.25 mm in diameter)
@@ -32,8 +32,8 @@ final int DEFAULT_FADE = 25;
 // Default minimal distance between two consecutive pins (only for CIRCLE mode)
 final int DEFAULT_MIN_DIST = 25;
 
-// Default value specifying how much the drawn lines vary from a straight 
-// line (preventing a moiré effect) 
+// Default value specifying how much the drawn lines vary from a straight
+// line (preventing a moiré effect)
 final int DEFAULT_LINE_VARATION = 3;
 
 // Default opacity of drawn lines.
@@ -52,7 +52,7 @@ static class Point {
     this.x = x;
     this.y = y;
   }
-  
+
   static Point of(int x, int y) {
     return new Point(x, y);
   }
@@ -75,17 +75,17 @@ class Slider {
     this.value = value;
     this.text = text;
   }
-  
+
   // Set slider value and redraw.
   void setValue(int value) {
     this.value = value;
     drawSelf();
   }
 
-  // Draw slider 
+  // Draw slider
   void drawSelf() {
     noStroke();
-    
+
     // Dark blue background
     fill(0, 43, 91);
     rect(x, y, w, h, h);
@@ -130,7 +130,7 @@ enum Mode {
 // Crops image to a circular shape.
 void cropImageCircle(PImage image) {
   final color white = color(255);
-  final Point center = Point.of(round(image.width / 2.0), 
+  final Point center = Point.of(round(image.width / 2.0),
                                 round(image.height / 2.0));
   final int radius = min(center.x, center.y);
   for (int i = 0; i < image.width; i++) {
@@ -152,29 +152,32 @@ ArrayList<Point> calcPins(int number, int w, int h, Mode mode) {
     final float radius = size / 2.0;
     final float angle = PI * 2.0 / number;
     for (int i = 0; i < number; ++i) {
-      pins.add(Point.of(round(radius + radius * sin(i * angle)),
-                        round(radius + radius * cos(i * angle))));
+      float theta = -HALF_PI + i * -angle;
+      pins.add(Point.of(
+        round(radius + radius * cos(theta)),
+        round(radius + radius * sin(theta))
+      ));
     }
   } else { // SQUARE / RECTANGLE
     int xPins = (number * w) / (2 * (h + w));
     int yPins = (number - (2 * xPins)) / 2;
     float spaceX = (float)w / xPins;
     float spaceY = (float)h / yPins;
-    // top left -> bottom left
-    for (int i = 0; i < yPins; ++i) {
-      pins.add(Point.of(0, round(spaceY * i)));
-    }
-    // bottom left -> bottom right
+    // Top side: left -> right
     for (int i = 0; i < xPins; ++i) {
+      pins.add(Point.of(round(spaceX * i), 0));
+    }
+    // Right side: top -> bottom (sin repetir esquina)
+    for (int i = 1; i < yPins; ++i) {
+      pins.add(Point.of(w, round(spaceY * i)));
+    }
+    // Bottom side: right -> left (sin repetir esquina)
+    for (int i = xPins - 1; i >= 0; --i) {
       pins.add(Point.of(round(spaceX * i), h));
     }
-    // bottom right -> top right
-    for (int i = 0; i < yPins; ++i) {
-      pins.add(Point.of(w, h - round(spaceY * i)));
-    }
-    // top right -> top left
-    for (int i = 0; i < xPins; ++i) {
-      pins.add(Point.of(w - round(spaceX * i), 0));
+    // Left side: bottom -> top (sin repetir esquina)
+    for (int i = yPins - 1; i > 0; --i) {
+      pins.add(Point.of(0, round(spaceY * i)));
     }
   }
   minX = minY = 999999;
@@ -225,7 +228,7 @@ double lineScore(PImage image, ArrayList<Point> points) {
   return (double)score / points.size();
 }
 
-// Reduce darkness of image's pixels the line from a to b passes through by 
+// Reduce darkness of image's pixels the line from a to b passes through by
 // a given value (0 - 255);
 void reduceLine(PImage image, ArrayList<Point> points, int value) {
   for (Point p : points) {
@@ -244,9 +247,9 @@ int pinPair(int a, int b) {
 }
 
 // Returns the next pin, so that the string from the current pin achieves the
-// maximum score. To prevent a string path from beeing used twice, a list of 
-// already used pin pairs can be given. The minimum distance between to 
-// consecutive pins is specified by minDistance. If no valid next pin can be 
+// maximum score. To prevent a string path from beeing used twice, a list of
+// already used pin pairs can be given. The minimum distance between to
+// consecutive pins is specified by minDistance. If no valid next pin can be
 // found -1 is returned.
 int nextPin(int current, HashMap<Integer, ArrayList<Point>> lines,
             HashSet<Integer> used, PImage image, int minDistance) {
@@ -255,7 +258,7 @@ int nextPin(int current, HashMap<Integer, ArrayList<Point>> lines,
   for (int i = 0; i < pins.size(); ++i) {
     if (current == i) continue;
     int pair = pinPair(current, i);
-    
+
     if (MODE == Mode.CIRCLE) {
       // Prevent two consecutive pins with less than minimal distance
       int diff = abs(current - i);
@@ -270,7 +273,7 @@ int nextPin(int current, HashMap<Integer, ArrayList<Point>> lines,
       if (pCurr.y == minY && pNext.y == minY) continue;
       if (pCurr.y == maxY && pNext.y == maxY) continue;
     }
-  
+
     // Prevent usage of already used pin pair
     if (used.contains(pair)) continue;
 
@@ -300,45 +303,50 @@ int totalThreadLength(IntList steps) {
 }
 
 void saveInstructions(String filename, IntList steps) {
-  String html = "<!DOCTYPE html><html> <head> <meta content=\"text/html;chars" + 
-                "et=utf-8\" http-equiv=\"Content-Type\"/> <style>*{box-sizing" + 
-                ": border-box;}body{-webkit-touch-callout: none; -webkit-user" + 
-                "-select: none; -khtml-user-select: none; -moz-user-select: n" + 
-                "one; -ms-user-select: none; user-select: none;}div{text-alig" + 
-                "n: center; font-family: sans-serif; line-height: 150%; text-" + 
-                "shadow: 0 2px 2px #b6701e; height: 100%; color: #fff;}p{font" + 
-                "-size: 4vw;}input{width: 100%; text-align: center;}.pin{posi" + 
-                "tion: absolute; top: 50%; left: 50%; transform: translate(-5" + 
-                "0%, -50%); width: 100%; padding: 20px; font-size: 16vw;}.con" + 
-                "tainer{display: table; width: 100%;}.left-half{background-co" + 
-                "lor: #0071DC; position: absolute; left: 0px; width: 50%;}.ri" + 
-                "ght-half{background-color: #002B5B; position: absolute; righ" + 
-                "t: 0px; width: 50%;}#step-input{font-size: 3vw;}</style> <sc" + 
-                "ript src=\"https://ajax.googleapis.com/ajax/libs/jquery/3.1." + 
-                "1/jquery.min.js\"> </script> <script src='https://code.respo" + 
-                "nsivevoice.org/responsivevoice.js'></script> <script type=\"" + 
-                "text/javascript\">var stepList=[\"start\",0,\"end\"]; var cu" + 
-                "rrent=0; function previous(){if (current > 0){current--; sho" + 
-                "wStep();}}function next(){if (current < stepList.length - 2)" + 
-                "{current++; showStep();}}function showStep(){$(\"#from-pin\"" + 
-                ").text(stepList[current]); $(\"#to-pin\").text(stepList[curr" + 
-                "ent + 1]); $(\"#step-input\").val(current); responsiveVoice." + 
-                "speak((stepList[current + 1]).toString());}function jumpToSt" + 
-                "ep(){current=parseInt($(\"#step-input\").val()); if (current" + 
-                " < 0) current=0; else if (current > stepList.length - 2) cur" + 
-                "rent=stepList.length - 2; showStep();}</script> <title>knitt" + 
-                "er</title> </head> <body onload=\"showStep()\"> <section cla" + 
-                "ss=\"container\"> <input id=\"step-input\" onchange=\"jumpTo" + 
-                "Step()\" type=\"tel\"> <div class=\"left-half\" onclick=\"pr" + 
-                "evious()\"> <p>from</p><span class=\"pin\" id=\"from-pin\">?" + 
-                "??</span> </div><div class=\"right-half\" onclick=\"next()\"" + 
-                "> <p>to</p><span class=\"pin\" id=\"to-pin\">???</span> </di" + 
+  String html = "<!DOCTYPE html><html> <head> <meta content=\"text/html;chars" +
+                "et=utf-8\" http-equiv=\"Content-Type\"/> <style>*{box-sizing" +
+                ": border-box;}body{-webkit-touch-callout: none; -webkit-user" +
+                "-select: none; -khtml-user-select: none; -moz-user-select: n" +
+                "one; -ms-user-select: none; user-select: none;}div{text-alig" +
+                "n: center; font-family: sans-serif; line-height: 150%; text-" +
+                "shadow: 0 2px 2px #b6701e; height: 80%; color: #fff;}p{font" +
+                "-size: 4vw;}input{width: 100%; text-align: center;}.pin{posi" +
+                "tion: absolute; top: 50%; left: 50%; transform: translate(-5" +
+                "0%, -50%); width: 100%; padding: 20px; font-size: 16vw;}.con" +
+                "tainer{display: table; width: 100%;}.left-half{background-co" +
+                "lor: #0071DC; position: absolute; left: 0px; width: 50%;}.ri" +
+                "ght-half{background-color: #002B5B; position: absolute; righ" +
+                "t: 0px; width: 50%;}#step-input{font-size: 3vw;}</style> <sc" +
+                "ript src=\"https://ajax.googleapis.com/ajax/libs/jquery/3.1." +
+                "1/jquery.min.js\"> </script> <script src='https://code.respo" +
+                "nsivevoice.org/responsivevoice.js'></script> <script type=\"" +
+                "text/javascript\">const stepList=[\"start\",13,\"end\"]; let cu" +
+                "rrent=0; let timer = null; const interval = 8000; function " +
+                "previous(){if (current > 0){current--; showStep();}}" +
+                "function next(){if (current < stepList.length - 2)" +
+                "{current++; showStep();}}const showStep = () => {$(\"#from-pin\"" +
+                ").text(stepList[current]); $(\"#to-pin\").text(stepList[curr" +
+                "ent + 1]); $(\"#step-input\").val(current); responsiveVoice." +
+                "speak((stepList[current + 1]).toString(),\"Spanish Female\");" +
+                " resetTimer(); }; const jumpToSt= () => " +
+                "{current=parseInt($(\"#step-input\").val()); if (current" +
+                " < 0) current=0; else if (current > stepList.length - 2) cur" +
+                "rent=stepList.length - 2; showStep();}; let resetTimer = () => " +
+                "{if (timer) clearInterval(timer);timer = setInterval(() => { "+
+                "next(); }, interval); }; window.onload = () => {showStep();};" +
+                "</script> <title>knitt" +
+                "er</title> </head> <body onload=\"showStep()\"> <section cla" +
+                "ss=\"container\"> <input id=\"step-input\" onchange=\"jumpTo" +
+                "Step()\" type=\"tel\"> <div class=\"left-half\" onclick=\"pr" +
+                "evious()\"> <p>from</p><span class=\"pin\" id=\"from-pin\">?" +
+                "??</span> </div><div class=\"right-half\" onclick=\"next()\"" +
+                "> <p>to</p><span class=\"pin\" id=\"to-pin\">???</span> </di" +
                 "v></section> </body></html>";
   String list = ",";
   for (int i = 0; i < steps.size(); i++) {
     list += steps.get(i) + ",";
   }
-  html = html.replace(",0,", list);
+  html = html.replace(",13,", list);
   saveBytes(filename, html.getBytes());
 }
 
@@ -356,7 +364,7 @@ PImage img;
 ArrayList<Point> pins;
 
 // Min/max pin coordinates
-int minX, minY, maxX, maxY; 
+int minX, minY, maxX, maxY;
 
 // List of all possible lines (keys are generated by pinPair())
 HashMap<Integer, ArrayList<Point>> lines;
@@ -370,7 +378,7 @@ Slider stringSlider;
 // Slider specifying the color value lines are darkened if a string runs through
 Slider fadeSlider;
 
-// Slider specifying the how much drawn lines vary from a straight line (preventing 
+// Slider specifying the how much drawn lines vary from a straight line (preventing
 // a moiré effect)
 Slider lineVariationSlider;
 
@@ -493,15 +501,15 @@ void drawSliders() {
 void generatePattern() {
   steps = new IntList();
   StringBuilder stepsInstructions = new StringBuilder();
-  
+
   // Work on copy of image
   PImage imgCopy = createImage(img.width, img.height, RGB);
   imgCopy.copy(img, 0, 0, img.width, img.height, 0, 0, img.width, img.height);
-  
-  // Always start from pin 0
-  int current = 0;  
+
+  // Always start from pin 13
+  int current = 13;
   steps.append(current);
-  
+
   HashSet<Integer> used = new HashSet<Integer>();
   for (int i = 0; i < stringSlider.value; ++i) {
     // Get next pin
@@ -510,20 +518,20 @@ void generatePattern() {
       stringSlider.setValue(used.size());
       break;
     }
-    
+
     // Reduce darkness in image
     int pair = pinPair(current, next);
     reduceLine(imgCopy, lines.get(pair), fadeSlider.value);
 
     stepsInstructions.append("String #").append(i).append(" -> next pin: ").append(next).append("\r\n");
-  
+
     used.add(pair);
     steps.append(next);
     current = next;
   }
-  
+
   println("Total thread length: " + totalThreadLength(steps) + " m");
-  
+
   // Save instructions in two different formats
   saveBytes("instruction.txt", stepsInstructions.toString().getBytes());
   saveInstructions("instruction.html", steps);
@@ -614,4 +622,4 @@ void mouseReleased() {
   redraw |= lineVariationSlider.handleMousePressed();
   redraw |= opacitySlider.handleMousePressed();
 }
-  
+
